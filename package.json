@@ -1,7 +1,7 @@
 {
   "name": "fivem-parking",
   "description": "Server-side vehicle garage for CitizenFX servers.",
-  "author": "BerkieBb, bd53",
+  "author": "BerkieBb, death_enclaimed",
   "version": "0.32.5",
   "license": "MIT",
   "type": "module",
@@ -13,9 +13,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/bd53/fivem-parking.git"
+    "url": "https://codeberg.org/death_enclaimed/fivem-parking"
   },
-  "bugs": "https://github.com/bd53/fivem-parking/issues",
   "prisma": {
     "schema": "./packages/database/schema.prisma"
   },
