@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -14,9 +15,7 @@ type Package struct {
 	Description string `json:"description"`
 	Author      string `json:"author"`
 	Version     string `json:"version"`
-	Repository  struct {
-		URL string `json:"url"`
-	} `json:"repository"`
+	Repository  struct { URL string `json:"url"` } `json:"repository"`
 	License  string    `json:"license"`
 	Manifest *Defaults `json:"manifest,omitempty"`
 }
@@ -34,6 +33,7 @@ type Defaults struct {
 type Config struct {
 	Package  string
 	Output   string
+	DryRun   bool
 	Defaults Defaults
 }
 
@@ -57,46 +57,41 @@ type ManifestGenerator struct {
 	config *Config
 }
 
-func new(config *Config) *ManifestGenerator {
+func New(config *Config) *ManifestGenerator {
 	return &ManifestGenerator{config: config}
 }
 
 func (mg *ManifestGenerator) load() (*Package, error) {
 	if _, err := os.Stat(mg.config.Package); os.IsNotExist(err) {
-		return nil, fmt.Errorf("os.Stat(); os.IsNotExist(): %w", err)
+		return nil, fmt.Errorf("package file not found %q: %w", mg.config.Package, err)
 	}
-
 	data, err := os.ReadFile(mg.config.Package)
 	if err != nil {
-		return nil, fmt.Errorf("os.ReadFile() %s: %w", mg.config.Package, err)
+		return nil, fmt.Errorf("reading package file %q: %w", mg.config.Package, err)
 	}
-
 	var pkg Package
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return nil, fmt.Errorf("json.Unmarshal() %s: %w", mg.config.Package, err)
+		return nil, fmt.Errorf("parsing package file %q: %w", mg.config.Package, err)
 	}
-
 	return &pkg, nil
 }
 
 func sanitize(s string) string {
-	replace := map[string]string{
-		"'":  "\\'",
-		"\n": "\\n",
-		"\r": "\\r",
+	replacements := []struct{ old, val string }{
+		{"'", "\\'"},
+		{"\n", "\\n"},
+		{"\r", "\\r"},
 	}
-
-	for old, new := range replace {
-		s = strings.ReplaceAll(s, old, new)
+	for _, r := range replacements {
+		s = strings.ReplaceAll(s, r.old, r.val)
 	}
 	return s
 }
 
-func add(lines *[]string, title string, items []string) {
+func addTable(lines *[]string, title string, items []string) {
 	if len(items) == 0 {
 		return
 	}
-
 	*lines = append(*lines, fmt.Sprintf("\n%s {", title))
 	for i, item := range items {
 		comma := ","
@@ -108,26 +103,22 @@ func add(lines *[]string, title string, items []string) {
 	*lines = append(*lines, "}")
 }
 
-func merge(defaults Defaults, manifest *Defaults) Defaults {
-	if manifest == nil {
-		return defaults
+func merge(base Defaults, override *Defaults) Defaults {
+	if override == nil {
+		return base
 	}
-
-	result := defaults
-	value := reflect.ValueOf(&result).Elem()
-	data := reflect.ValueOf(manifest).Elem()
-
-	for i := 0; i < data.NumField(); i++ {
-		field := data.Field(i)
-		if !field.IsZero() {
-			value.Field(i).Set(field)
+	result := base
+	dst := reflect.ValueOf(&result).Elem()
+	src := reflect.ValueOf(override).Elem()
+	for i := 0; i < src.NumField(); i++ {
+		if field := src.Field(i); !field.IsZero() {
+			dst.Field(i).Set(field)
 		}
 	}
-
 	return result
 }
 
-func optional(lines *[]string, field, value string) {
+func addField(lines *[]string, field, value string) {
 	if value != "" {
 		*lines = append(*lines, fmt.Sprintf("%s '%s'", field, sanitize(value)))
 	}
@@ -135,68 +126,58 @@ func optional(lines *[]string, field, value string) {
 
 func (mg *ManifestGenerator) write(pkg *Package) string {
 	var lines []string
-
-	config := merge(mg.config.Defaults, pkg.Manifest)
-
-	lines = append(lines, fmt.Sprintf("fx_version '%s'", config.FxVersion))
-	lines = append(lines, fmt.Sprintf("game '%s'", config.Game))
-
-	opt := []struct {
-		field string
-		value string
-	}{
+	cfg := merge(mg.config.Defaults, pkg.Manifest)
+	lines = append(lines, fmt.Sprintf("fx_version '%s'", cfg.FxVersion), fmt.Sprintf("game '%s'", cfg.Game))
+	for _, f := range []struct{ field, value string }{
 		{"name", pkg.Name},
 		{"description", pkg.Description},
 		{"author", pkg.Author},
 		{"version", pkg.Version},
 		{"repository", pkg.Repository.URL},
 		{"license", pkg.License},
-		{"node_version", config.NodeVersion},
+		{"node_version", cfg.NodeVersion},
+	} {
+		addField(&lines, f.field, f.value)
 	}
-
-	for _, pf := range opt {
-		optional(&lines, pf.field, pf.value)
-	}
-
-	req := []struct {
+	for _, section := range []struct {
 		title string
 		items []string
 	}{
-		{"client_scripts", config.Client},
-		{"server_scripts", config.Server},
-		{"files", config.Files},
-		{"dependencies", config.Dependencies},
+		{"client_scripts", cfg.Client},
+		{"server_scripts", cfg.Server},
+		{"files", cfg.Files},
+		{"dependencies", cfg.Dependencies},
+	} {
+		addTable(&lines, section.title, section.items)
 	}
-
-	for _, section := range req {
-		add(&lines, section.title, section.items)
-	}
-
 	return strings.Join(lines, "\n")
 }
 
 func (mg *ManifestGenerator) Generate() error {
 	pkg, err := mg.load()
 	if err != nil {
-		return err
+		return fmt.Errorf("loading package: %w", err)
 	}
-
 	manifest := mg.write(pkg)
-
-	if err := os.WriteFile(mg.config.Output, []byte(manifest), 0644); err != nil {
-		return fmt.Errorf("os.WriteFile() %s: %w", mg.config.Output, err)
+	if mg.config.DryRun {
+		fmt.Println(manifest)
+		return nil
 	}
-
+	if err := os.WriteFile(mg.config.Output, []byte(manifest), 0644); err != nil {
+		return fmt.Errorf("writing manifest %q: %w", mg.config.Output, err)
+	}
 	return nil
 }
 
 func main() {
 	config := Init()
-	generator := new(config)
-
+	flag.BoolVar(&config.DryRun, "dry-run", false, "dry-run")
+	flag.Parse()
+	generator := New(config)
 	if err := generator.Generate(); err != nil {
 		log.Fatalf("generator.Generate(): %v", err)
 	}
-
-	fmt.Printf("Successfully generated %s\n", config.Output)
+	if !config.DryRun {
+		fmt.Printf("Successfully generated %s\n", config.Output)
+	}
 }

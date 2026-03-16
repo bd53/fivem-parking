@@ -20,18 +20,10 @@ async function build(development) {
           build.onLoad({ filter: /.\.(js|ts)$/ }, async (args) => {
             const data = await readFile(args.path, 'utf8');
             const escape = (p) => (/^win/.test(process.platform) ? p.replace(/\\/g, '/') : p);
-
             const global = /__(?=(filename|dirname))/g;
             const cache = global.test(data);
-
-            const location = cache
-              ? `const location = { filename: '${escape(args.path)}', dirname: '${escape(path.dirname(args.path))}' }; let __line = 0;\n`
-              : '';
-
-            const insert = data
-              .split('\n')
-              .map((line, index) => `${line.includes('__line') ? `__line=${index + 1};` : ''}${line}`)
-              .join('\n');
+            const location = cache ? `const location = { filename: '${escape(args.path)}', dirname: '${escape(path.dirname(args.path))}' }; let __line = 0;\n` : '';
+            const insert = data.split('\n').map((line, index) => `${line.includes('__line') ? `__line=${index + 1};` : ''}${line}`).join('\n');
 
             return {
               contents: cache ? location + insert.replace(global, 'location.') : insert,
