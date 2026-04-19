@@ -8,8 +8,8 @@ A realistic vehicle garage system for FiveM, allowing players to store and retri
 
 ## Features
 
-- Utilizes [Prisma](https://www.prisma.io) to interact with your database.
-- Menu is handled via ox_lib's [interface](https://overextended.dev/ox_lib/Modules/Interface/Client/context) module, which has replaced the old React + Mantine interface.
+- Utilises [Prisma](https://www.prisma.io) to interact with your database.
+- Menu is handled via Svelte, which has replaced the old ox_lib [interface](https://overextended.dev/ox_lib/Modules/Interface/Client/context) module.
 - Supports logging via Discord.
 - Administrators have the ability to manage and oversee vehicles via command.
 
@@ -17,21 +17,19 @@ A realistic vehicle garage system for FiveM, allowing players to store and retri
 
 ### Dependencies
 
-- [ox_lib](https://github.com/overextended/ox_lib)
-- [ox_core](https://github.com/overextended/ox_core)
-- [ox_inventory](https://github.com/overextended/ox_inventory)
+- None required for core functionality.
 
 ### Build
 
-1. Download the LTS version of [Node.js](https://nodejs.org/en) and the latest version of [Go](https://go.dev/dl/).
+1. Download the LTS version of [Node.js](https://nodejs.org/en).
 2. Open a command-line terminal (e.g., Terminal, Command Prompt).
-3. Enter `node --version` and `go version` to verify the installation.
+3. Enter `node --version` to verify the installation.
 4. Run `npm install -g pnpm` to globally install the package manager [pnpm](https://pnpm.io).
 5. Download or clone the repository with `git clone https://github.com/bd53/fivem-parking`.
 6. Install all dependencies with `pnpm i`.
 7. Create a new file named `.env` within the root directory.
 8. Copy the contents of `.env.example` to the newly created `.env` file and edit accordingly.
-9. Connect your database to add Prisma models to `schema.prisma` and generate Prisma client using `pnpm connect`.
+9. Generate the Prisma client with `pnpm connect`.
 10. Build the resource with `pnpm build`.
 
 Use `pnpm watch` to rebuild whenever a file is modified.
@@ -42,16 +40,52 @@ Use `pnpm watch` to rebuild whenever a file is modified.
 
 #### Player
 
-- `/list` _(alias: `/vg`)_ – Lists owned vehicles and their status; only `stored` vehicles can be spawned.
+- `/list` _(alias: `/vg`)_ – Lists owned vehicles and their status:
+  - Spawn – available when the vehicle is `stored`.
+  - Return from Impound – available when the vehicle is `impound`; requires player to be at impound location.
+  - Currently Outside – shown when the vehicle is already in the world; no action available.
 - `/park` _(alias: `/vp`)_ – Store a vehicle in your vehicle garage.
-- `/return [vehicleId]` _(alias: `/vi`)_ – Retrieve a vehicle from the impound.
 
 #### Admin
 
-- `/addveh [model] [playerId]` – Adds a vehicle to database and target player's vehicle garage.
-- `/deleteveh [plate]` _(alias: `/delveh`)_ – Removes a vehicle from database and owner's vehicle garage.
-- `/admincar [model]` _(alias: `/acar`)_ – Spawns and saves vehicle to database and your vehicle garage.
-- `/alist [playerId]` _(alias: `/avg`)_ – Lists target player's owned vehicles.
+- `/addveh [model] [playerId]` – Adds a vehicle to the database and the target player's garage.
+- `/deleteveh [plate]` _(alias: `/delveh`)_ – Removes a vehicle from the database and the owner's garage.
+- `/admincar [model]` _(alias: `/acar`)_ – Spawns a vehicle, saves it to the database, and sets it as owned.
+- `/alist [playerId]` _(alias: `/avg`)_ – Lists a target player's owned vehicles.
+
+### Exports
+
+#### Server
+
+- `impoundVehicle(plate: string): Promise<boolean>` - Sets a vehicle to the `impound` state by plate.
+
+```lua
+local success = exports['fivem-parking']:impoundVehicle(plate)
+```
+
+- `getVehicleByPlate(plate: string): Promise<Vehicle | null>` - Returns the full vehicle record for a given plate.
+
+```lua
+local vehicle = exports['fivem-parking']:getVehicleByPlate(plate)
+```
+
+- `getPlayerVehicles(license: string): Promise<Vehicle[]>` - Returns all vehicles owned by the given license identifier.
+
+```lua
+local vehicles = exports['fivem-parking']:getPlayerVehicles(license)
+```
+
+- `setVehicleStatus(plate: string, status: string): Promise<boolean>` - Sets the status of a vehicle by plate, `stored`, `outside`, or `impound`.
+
+```lua
+local success = exports['fivem-parking']:setVehicleStatus(plate, 'stored')
+```
+
+- `isVehicleOutside(plate: string): Promise<boolean>` - Returns `true` if the vehicle is currently spawned in the world.
+
+```lua
+local outside = exports['fivem-parking']:isVehicleOutside(plate)
+```
 
 ## Credits
 
