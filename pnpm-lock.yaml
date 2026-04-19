@@ -23,10 +23,10 @@ importers:
     devDependencies:
       '@citizenfx/client':
         specifier: latest
-        version: 2.0.13796-1
+        version: 2.0.28108-1
       '@citizenfx/server':
         specifier: latest
-        version: 2.0.13796-1
+        version: 2.0.28108-1
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.0.0
         version: 7.0.0(svelte@5.55.4)(vite@8.0.8(@types/node@22.13.13)(esbuild@0.28.0)(jiti@2.5.1)(sass@1.99.0))
@@ -59,11 +59,11 @@ packages:
     resolution: {integrity: sha512-D2hP9eA+Sqx1kBZgzxZh0y1trbuU+JoDkiEwqhQ36nodYqJwyEIhPSdMNd7lOm/4io72luTPWH20Yda0xOuUow==}
     engines: {node: '>=6.9.0'}
 
-  '@citizenfx/client@2.0.13796-1':
-    resolution: {integrity: sha512-20Ce2UZwL9Hg7A5+uR7SMVSA6g12bt6XDxiYHBeTTmi7xfNC9TgzWW8KyLiSpyFsDeH0/QZZKwxDha9v1/RwHw==}
+  '@citizenfx/client@2.0.28108-1':
+    resolution: {integrity: sha512-W8u2MxUAxKkKd3e8TFK88SbQJjB7z1w85heTejB37U+9Krp1HAi94Id9KKr8upn2Rybw2PNObZtdtzuGY/9fsg==}
 
-  '@citizenfx/server@2.0.13796-1':
-    resolution: {integrity: sha512-FsSNHNeZPMQIEmTerirPdv41jNu1f/MXmqyn2G3VUH+JU10JK80TqNhb/LGwMVtjvI9O7PN0VGWwKsOE2d5OtA==}
+  '@citizenfx/server@2.0.28108-1':
+    resolution: {integrity: sha512-Rr8oqmWWRebVVW4NWrHClfSiKEaCIBiHYuSPwvnVmNwZF/v8KHlIMchYwgyZAP7fkEEIdAntj52fCKePJ5bN6A==}
 
   '@emnapi/core@1.9.2':
     resolution: {integrity: sha512-UC+ZhH3XtczQYfOlu3lNEkdW/p4dsJ1r/bP7H8+rhao3TTTMO1ATq/4DdIi23XuGoFY+Cz0JmCbdVl0hz9jZcA==}
@@ -546,8 +546,8 @@ packages:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
     engines: {node: '>=0.10.0'}
 
-  defu@6.1.4:
-    resolution: {integrity: sha512-mEQCMmwJu317oSz8CwdIOdwf3xMif1ttiM8LTufzc3g6kR+9Pe236twL8j3IYT1F7GfRgGcW6MWxzZjLIkuHIg==}
+  defu@6.1.7:
+    resolution: {integrity: sha512-7z22QmUWiQ/2d0KkdYmANbRUVABpZ9SNYyH5vx6PZ+nE5bcC0l7uFvEfHlyld/HcGBFTL536ClDt3DEcSlEJAQ==}
 
   destr@2.0.5:
     resolution: {integrity: sha512-ugFTXCtDZunbzasqBxrK93Ik/DRYsO6S/fedkWEMKqt04xZ4csmnmwGDBAb07QWNaGMAmnTIemsYZCksjATwsA==}
@@ -738,6 +738,7 @@ packages:
   node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
     engines: {node: '>=10.5.0'}
+    deprecated: Use your platform's native DOMException instead
 
   node-fetch-native@1.6.7:
     resolution: {integrity: sha512-g9yhqoedzIUm0nTnTqAQvueMPVOuIY16bqgAJJC8XOOubYFNwz6IER9qs0Gq2Xd0+CecCKFjtdDTMA4u4xG06Q==}
@@ -945,9 +946,9 @@ snapshots:
 
   '@babel/helper-validator-identifier@7.27.1': {}
 
-  '@citizenfx/client@2.0.13796-1': {}
+  '@citizenfx/client@2.0.28108-1': {}
 
-  '@citizenfx/server@2.0.13796-1': {}
+  '@citizenfx/server@2.0.28108-1': {}
 
   '@emnapi/core@1.9.2':
     dependencies:
@@ -1262,7 +1263,7 @@ snapshots:
     dependencies:
       chokidar: 4.0.3
       confbox: 0.2.2
-      defu: 6.1.4
+      defu: 6.1.7
       dotenv: 16.6.1
       exsolve: 1.0.7
       giget: 2.0.0
@@ -1293,7 +1294,7 @@ snapshots:
 
   deepmerge@4.3.1: {}
 
-  defu@6.1.4: {}
+  defu@6.1.7: {}
 
   destr@2.0.5: {}
 
@@ -1371,7 +1372,7 @@ snapshots:
     dependencies:
       citty: 0.1.6
       consola: 3.4.2
-      defu: 6.1.4
+      defu: 6.1.7
       node-fetch-native: 1.6.7
       nypm: 0.6.1
       pathe: 2.0.3
@@ -1529,7 +1530,7 @@ snapshots:
 
   rc9@2.1.2:
     dependencies:
-      defu: 6.1.4
+      defu: 6.1.7
       destr: 2.0.5
 
   read-package-up@11.0.0:
