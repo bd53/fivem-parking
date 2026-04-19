@@ -1,50 +1,66 @@
-import * as Cfx from '@nativewrappers/fivem';
-import { GetPlayer, SpawnVehicle } from '@overextended/ox_core/server';
-import { onClientCallback } from '@overextended/ox_lib/server';
-import Config from '../common/config';
-import Locale from '../common/locale';
-import { hasItem, removeItem, sendChatMessage, sendLog } from '../common/utils';
-import './commands';
-import db from './db';
+import { sendChatMessage } from "../common/utils";
+import "./commands";
+import db from "./db";
+import { Garage } from "./garage/class";
 
-onClientCallback('fivem-parking:server:spawnVehicle', async (source: number, vehicleId: number) => {
-  const player = GetPlayer(source);
+const cooldowns = new Map<number, number>();
+const COOLDOWN_MS = 5000;
 
-  if (!player?.charId) return false;
+on("playerDropped", () => {
+        cooldowns.delete(source);
+});
 
-  const vehicle = await db.getVehicleById(vehicleId);
-  if (!vehicle) {
-    sendChatMessage(source, Locale('something_went_wrong'));
-    return false;
-  }
+function checkCooldown(src: number): boolean {
+        const last = cooldowns.get(src);
+        const now = Date.now();
+        if (last !== undefined && now - last < COOLDOWN_MS) return false;
+        cooldowns.set(src, now);
+        return true;
+}
 
-  const owner = await db.getVehicleOwner(vehicleId, player.charId);
-  if (!owner) {
-    sendChatMessage(source, Locale('not_vehicle_owner'));
-    return false;
-  }
+exports("impoundVehicle", async (plate: string): Promise<boolean> => {
+        const vehicle = await db.getVehicleByPlate(plate.trim());
+        if (!vehicle) return false;
+        await db.setVehicleStatus(vehicle.id, "impound");
+        return true;
+});
 
-  if (!hasItem(source, Config.Item, Config.Garage.RetrieveCost)) {
-    sendChatMessage(source, Locale('not_enough_money'));
-    return false;
-  }
+exports("getVehicleByPlate", async (plate: string) => {
+        return await db.getVehicleByPlate(plate.trim());
+});
 
-  const money = await removeItem(source, Config.Item, Config.Garage.RetrieveCost);
-  if (!money) return false;
+exports("getPlayerVehicles", async (license: string) => {
+        return await db.getOwnedVehicles(license.trim());
+});
 
-  await Cfx.Delay(100);
+exports("setVehicleStatus", async (plate: string, status: string): Promise<boolean> => {
+        if (!["stored", "outside", "impound"].includes(status)) return false;
+        const vehicle = await db.getVehicleByPlate(plate.trim());
+        if (!vehicle) return false;
+        await db.setVehicleStatus(vehicle.id, status);
+        return true;
+});
 
-  const success = await SpawnVehicle(vehicleId, player.getCoords());
-  if (!success) {
-    sendChatMessage(source, Locale('failed_to_spawn'));
-    return;
-  }
+exports("isVehicleOutside", async (plate: string): Promise<boolean> => {
+        const vehicle = await db.getVehicleByPlate(plate.trim());
+        if (!vehicle) return false;
+        return vehicle.stored === "outside";
+});
 
-  setImmediate(() => {
-    TaskWarpPedIntoVehicle(GetPlayerPed(source), success.entity, -1);
-  });
+onNet("fivem-parking:server:returnVehicle", async (vehicleId: number) => {
+        const src = source;
+        if (!checkCooldown(src)) {
+                sendChatMessage(src, "^#d73232ERROR ^#ffffffPlease wait before performing another vehicle action.");
+                return;
+        }
+        await Garage.prototype.returnVehicle(src, { vehicleId });
+});
 
-  await db.setVehicleStatus(vehicleId, 'outside');
-  sendChatMessage(source, Locale('success_spawned'));
-  await sendLog(`[VEHICLE] ${player.get('name')} (${source}) just spawned their vehicle #${vehicleId}! Position: ${player.getCoords()[0]} ${player.getCoords()[1]} ${player.getCoords()[2]} - dimension: ${GetPlayerRoutingBucket(String(source))}.`);
+onNet("fivem-parking:server:spawnVehicle", async (vehicleId: number) => {
+        const src = source;
+        if (!checkCooldown(src)) {
+                sendChatMessage(src, "^#d73232ERROR ^#ffffffPlease wait before performing another vehicle action.");
+                return;
+        }
+        await Garage.prototype.spawnVehicle(src, { vehicleId });
 });

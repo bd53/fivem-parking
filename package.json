@@ -1,57 +1,38 @@
 {
-  "name": "fivem-parking",
-  "description": "Server-side vehicle garage for CitizenFX servers.",
-  "author": "BerkieBb, bd53",
-  "version": "0.32.5",
-  "license": "MIT",
-  "type": "module",
-  "scripts": {
-    "connect": "npx prisma db pull && npx prisma generate",
-    "build": "node scripts/build.js && go run scripts/manifest.go",
-    "watch": "node scripts/build.js --watch",
-    "ci": "pnpm run connect && pnpm run build"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/bd53/fivem-parking.git"
-  },
-  "prisma": {
-    "schema": "./packages/database/schema.prisma"
-  },
-  "manifest": {
-    "client_scripts": [
-      "dist/client/*.js"
-    ],
-    "server_scripts": [
-      "dist/server/*.js"
-    ],
-    "files": [
-      "locales/*.json"
-    ],
-    "dependencies": [
-      "/server:12913",
-      "/onesync",
-      "ox_lib",
-      "ox_core",
-      "ox_inventory"
-    ]
-  },
-  "dependencies": {
-    "@nativewrappers/fivem": "^0.0.90",
-    "@nativewrappers/server": "^0.0.90",
-    "@overextended/ox_core": "^1.5.1",
-    "@overextended/ox_lib": "latest",
-    "@prisma/client": "^6.13.0",
-    "node-fetch": "^3.3.2"
-  },
-  "devDependencies": {
-    "@citizenfx/client": "latest",
-    "@citizenfx/server": "latest",
-    "@types/node": "^22.13.11",
-    "esbuild": "^0.25.1",
-    "prisma": "^6.13.0"
-  },
-  "engines": {
-    "node": ">=22.9.0"
-  }
+        "name": "fivem-parking",
+        "description": "Server-side vehicle garage for CitizenFX servers.",
+        "author": "BerkieBb, bd53",
+        "version": "0.32.5",
+        "license": "MIT",
+        "type": "module",
+        "scripts": {
+                "connect": "pnpm exec prisma generate",
+                "build": "vite build && node scripts/build.js && node scripts/manifest.js",
+                "watch": "node scripts/build.js --watch",
+                "ci": "pnpm run connect && pnpm run build"
+        },
+        "repository": {
+                "type": "git",
+                "url": "https://github.com/bd53/fivem-parking.git"
+        },
+        "dependencies": {
+                "@nativewrappers/fivem": "^0.0.90",
+                "@nativewrappers/server": "^0.0.90",
+                "@prisma/client": "^6.13.0",
+                "node-fetch": "^3.3.2"
+        },
+        "devDependencies": {
+                "@citizenfx/client": "latest",
+                "@citizenfx/server": "latest",
+                "@sveltejs/vite-plugin-svelte": "^7.0.0",
+                "@types/node": "^22.13.11",
+                "esbuild": "^0.28.0",
+                "prisma": "^6.13.0",
+                "sass": "^1.99.0",
+                "svelte": "^5.28.2",
+                "vite": "^8.0.0"
+        },
+        "engines": {
+                "node": ">=22.9.0"
+        }
 }
