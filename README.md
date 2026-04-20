@@ -1,38 +1,28 @@
 # fivem-parking
 
-A realistic vehicle garage system for FiveM, allowing players to store and retrieve owned vehicles from any location.
+A vehicle garage system for FiveM, allowing players to store and retrieve owned vehicles from any location.
 
 [![](https://img.shields.io/badge/License-MIT-blue?logo=opensource)](./LICENSE)
 [![](https://img.shields.io/github/contributors/bd53/fivem-parking?logo=github)](https://github.com/bd53/fivem-parking/graphs/contributors)
 [![](https://img.shields.io/github/last-commit/bd53/fivem-parking?logo=github)](https://github.com/bd53/fivem-parking/commits/main)
 
-## Features
+## Building
 
-- Utilises [Prisma](https://www.prisma.io) to interact with your database.
-- Menu is handled via Svelte, which has replaced the old ox_lib [interface](https://overextended.dev/ox_lib/Modules/Interface/Client/context) module.
-- Supports logging via Discord.
-- Administrators have the ability to manage and oversee vehicles via command.
+Requires [pnpm](https://pnpm.io/).
 
-## Installation
-
-### Dependencies
-
-- None required for core functionality.
-
-### Build
-
-1. Download the LTS version of [Node.js](https://nodejs.org/en).
-2. Open a command-line terminal (e.g., Terminal, Command Prompt).
-3. Enter `node --version` to verify the installation.
-4. Run `npm install -g pnpm` to globally install the package manager [pnpm](https://pnpm.io).
-5. Download or clone the repository with `git clone https://github.com/bd53/fivem-parking`.
-6. Install all dependencies with `pnpm i`.
-7. Create a new file named `.env` within the root directory.
-8. Copy the contents of `.env.example` to the newly created `.env` file and edit accordingly.
-9. Generate the Prisma client with `pnpm connect`.
-10. Build the resource with `pnpm build`.
+```bash
+pnpm build
+```
 
 Use `pnpm watch` to rebuild whenever a file is modified.
+
+## Setup
+
+This resource won't work without [oxmysql](https://github.com/overextended/oxmysql).
+
+1. Download or clone the repository with `git clone https://github.com/bd53/fivem-parking`.
+2. Copy `fivem-parking` folder into the `resources/` directory.
+3. Add `ensure fivem-parking` to where resources are being loaded (after oxmysql resource).
 
 ## Usage
 
@@ -42,7 +32,7 @@ Use `pnpm watch` to rebuild whenever a file is modified.
 
 - `/list` _(alias: `/vg`)_ – Lists owned vehicles and their status:
   - Spawn – available when the vehicle is `stored`.
-  - Return from Impound – available when the vehicle is `impound`; requires player to be at impound location.
+  - Return from Impound – available when the vehicle is `impound`.
   - Currently Outside – shown when the vehicle is already in the world; no action available.
 - `/park` _(alias: `/vp`)_ – Store a vehicle in your vehicle garage.
 
@@ -90,3 +80,7 @@ local outside = exports['fivem-parking']:isVehicleOutside(plate)
 ## Credits
 
 - [BerkieB](https://github.com/BerkieBb) originally made this resource. I wanted it publicly available, so here it is.
+
+## License
+
+A complete copy of the license is included in the [fivem-parking/LICENSE](./LICENSE) file.

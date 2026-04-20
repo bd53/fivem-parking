@@ -1,15 +1,75 @@
 import { context } from "esbuild";
+import { readFileSync, writeFileSync } from "fs";
 import { readFile } from "fs/promises";
 import path from "path";
 import process from "process";
 
 const watch = process.argv.includes("--watch");
+const dry = process.argv.includes("--dry-run");
 const windows = /^win/.test(process.platform);
 const escape = (p) => (windows ? p.replace(/\\/g, "/") : p);
 
+const MANIFEST_DEFAULTS = {
+        fx_version: "cerulean",
+        game: "gta5",
+        node_version: "22",
+        ui_page: "dist/web/index.html",
+        client_scripts: ["dist/client/*.js"],
+        server_scripts: ["dist/server/*.js"],
+        files: ["dist/web/**/*"],
+        dependencies: ["/server:12913", "/onesync"],
+};
+
+function sanitize(s) {
+        return s.replace(/['\n\r]/g, (c) => ({ "'": "\\'", "\n": "\\n", "\r": "\\r" })[c] ?? c);
+}
+
+function addField(lines, field, value) {
+        if (value) lines.push(`${field} '${sanitize(value)}'`);
+}
+
+function addTable(lines, title, items) {
+        if (!items?.length) return;
+        lines.push(`\n${title} {`);
+        lines.push(items.map((item) => `\t'${sanitize(item)}'`).join(",\n"));
+        lines.push("}");
+}
+
+function generateManifest() {
+        const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+
+        const lines = [
+                `fx_version '${MANIFEST_DEFAULTS.fx_version}'`,
+                `game '${MANIFEST_DEFAULTS.game}'`,
+        ];
+
+        addField(lines, "name", pkg.name);
+        addField(lines, "description", pkg.description);
+        addField(lines, "author", pkg.author);
+        addField(lines, "version", pkg.version);
+        addField(lines, "repository", pkg.repository?.url);
+        addField(lines, "license", pkg.license);
+        addField(lines, "node_version", MANIFEST_DEFAULTS.node_version);
+        addField(lines, "ui_page", MANIFEST_DEFAULTS.ui_page);
+
+        addTable(lines, "client_scripts", MANIFEST_DEFAULTS.client_scripts);
+        addTable(lines, "server_scripts", MANIFEST_DEFAULTS.server_scripts);
+        addTable(lines, "files", MANIFEST_DEFAULTS.files);
+        addTable(lines, "dependencies", MANIFEST_DEFAULTS.dependencies);
+
+        const manifest = lines.join("\n");
+
+        if (dry) {
+                console.log(manifest);
+        } else {
+                writeFileSync("fxmanifest.lua", manifest);
+                console.log("Successfully generated fxmanifest.lua");
+        }
+}
+
 async function build(development) {
         const ctx = await context({
-                entryPoints: ["./src/client/index.ts", "./src/server/index.ts"],
+                entryPoints: ["./client/index.ts", "./server/index.ts"],
                 outdir: "./dist",
                 platform: "node",
                 target: "node22",
@@ -27,7 +87,7 @@ async function build(development) {
                                                 return {
                                                         contents: shim ? location + insert.replace(/__(?=(filename|dirname))/g, "location.") : insert,
                                                         loader: path.extname(args.path).slice(1),
-                                                }
+                                                };
                                         });
                                         build.onEnd((result) => {
                                                 if (result.errors.length > 0) {
@@ -36,6 +96,7 @@ async function build(development) {
                                                         return;
                                                 }
                                                 console.log(development ? "Successfully built (development)" : "Successfully built (production)");
+                                                generateManifest();
                                         });
                                 },
                         },

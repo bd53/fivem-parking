@@ -1,5 +1,9 @@
 import fetch from "node-fetch";
-import Config from "./config";
+import type Raw from "../../static/config.json";
+
+export type Config = typeof Raw;
+
+export const Config = JSON.parse(LoadResourceFile(GetCurrentResourceName(), "static/config.json")) as Config;
 
 export function loadJson<T = unknown>(path: string): T {
         return JSON.parse(LoadResourceFile(GetCurrentResourceName(), path)) as T;

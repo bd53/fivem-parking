@@ -6,10 +6,8 @@
         "license": "MIT",
         "type": "module",
         "scripts": {
-                "connect": "pnpm exec prisma generate",
-                "build": "vite build && node scripts/build.js && node scripts/manifest.js",
-                "watch": "node scripts/build.js --watch",
-                "ci": "pnpm run connect && pnpm run build"
+                "build": "vite build && node build.js",
+                "watch": "node build.js --watch"
         },
         "repository": {
                 "type": "git",
@@ -18,7 +16,6 @@
         "dependencies": {
                 "@nativewrappers/fivem": "^0.0.90",
                 "@nativewrappers/server": "^0.0.90",
-                "@prisma/client": "^6.13.0",
                 "node-fetch": "^3.3.2"
         },
         "devDependencies": {
@@ -27,7 +24,6 @@
                 "@sveltejs/vite-plugin-svelte": "^7.0.0",
                 "@types/node": "^22.13.11",
                 "esbuild": "^0.28.0",
-                "prisma": "^6.13.0",
                 "sass": "^1.99.0",
                 "svelte": "^5.28.2",
                 "vite": "^8.0.0"

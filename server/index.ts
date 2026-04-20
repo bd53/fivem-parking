@@ -1,7 +1,7 @@
-import { sendChatMessage } from "../common/utils";
+import { sendChatMessage } from "./utils";
 import "./commands";
 import db from "./db";
-import { Garage } from "./garage/class";
+import { garage } from "./garage/class";
 
 const cooldowns = new Map<number, number>();
 const COOLDOWN_MS = 5000;
@@ -53,7 +53,7 @@ onNet("fivem-parking:server:returnVehicle", async (vehicleId: number) => {
                 sendChatMessage(src, "^#d73232ERROR ^#ffffffPlease wait before performing another vehicle action.");
                 return;
         }
-        await Garage.prototype.returnVehicle(src, { vehicleId });
+        await garage.returnVehicle(src, { vehicleId });
 });
 
 onNet("fivem-parking:server:spawnVehicle", async (vehicleId: number) => {
@@ -62,5 +62,5 @@ onNet("fivem-parking:server:spawnVehicle", async (vehicleId: number) => {
                 sendChatMessage(src, "^#d73232ERROR ^#ffffffPlease wait before performing another vehicle action.");
                 return;
         }
-        await Garage.prototype.spawnVehicle(src, { vehicleId });
+        await garage.spawnVehicle(src, { vehicleId });
 });

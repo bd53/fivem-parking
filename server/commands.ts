@@ -1,17 +1,17 @@
 import { Command } from "@nativewrappers/server";
-import Config from "../common/config";
-import { Garage } from "./garage/class";
+import { Config } from "./utils";
+import { garage } from "./garage/class";
 
 new Command(["list", "vg"], "View a list of your owned vehicles.", async ({ source }) => {
-        await Garage.prototype.listVehicles(source);
+        await garage.listVehicles(source);
 }, undefined, false);
 
 new Command(["park", "vp"], "Store a vehicle in to your personal garage.", async ({ source }) => {
-        await Garage.prototype.parkVehicle(source);
+        await garage.parkVehicle(source);
 }, undefined, false);
 
 new Command(["addveh"], "Create a new vehicle and grant it to the target player.", async (args) => {
-        await Garage.prototype.adminGiveVehicle(args.source, {
+        await garage.adminGiveVehicle(args.source, {
                 model: args.model,
                 playerId: args.playerId,
         });
@@ -27,7 +27,7 @@ new Command(["addveh"], "Create a new vehicle and grant it to the target player.
 ] as const, Config.Group);
 
 new Command(["deleteveh", "delveh"], "Delete a vehicle from the database and the owner's personal garage.", async (args) => {
-        await Garage.prototype.adminDeleteVehicle(args.source, {
+        await garage.adminDeleteVehicle(args.source, {
                 plate: args.plate,
         });
 }, [
@@ -38,7 +38,7 @@ new Command(["deleteveh", "delveh"], "Delete a vehicle from the database and the
 ] as const, Config.Group);
 
 new Command(["admincar", "acar"], "Create a new vehicle and set it as owned.", async (args) => {
-        await Garage.prototype.adminSetVehicle(args.source, {
+        await garage.adminSetVehicle(args.source, {
                 model: args.model,
         });
 }, [
@@ -49,7 +49,7 @@ new Command(["admincar", "acar"], "Create a new vehicle and set it as owned.", a
 ] as const, Config.Group);
 
 new Command(["alist", "avg"], "View a list of the target player's owned vehicles.", async (args) => {
-        await Garage.prototype.adminViewVehicles(args.source, {
+        await garage.adminViewVehicles(args.source, {
                 playerId: args.playerId,
         });
 }, [

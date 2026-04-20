@@ -1,14 +1,15 @@
 import * as Cfx from "@nativewrappers/fivem";
-import Config from "../../common/config";
-import { generatePlate, getArea, getPlayerDisplayName, getPlayerLicense, isValidModelName, isValidPlate, sendChatMessage, sendLog } from "../../common/utils";
+import { Config, generatePlate, getArea, getPlayerDisplayName, getPlayerLicense, isValidModelName, isValidPlate, sendChatMessage, sendLog } from "../utils";
 import db from "../db";
 
 export class Garage {
+        constructor(private db: typeof db) {}
+
         public async listVehicles(source: number) {
                 const license = getPlayerLicense(source);
                 if (!license) return [];
 
-                const vehicles = await db.getOwnedVehicles(license);
+                const vehicles = await this.db.getOwnedVehicles(license);
                 if (!vehicles || vehicles.length === 0) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffYou do not own any vehicles!");
                         return [];
@@ -40,7 +41,7 @@ export class Garage {
                         return false;
                 }
 
-                const vehicle = await db.getVehicleByPlate(plate);
+                const vehicle = await this.db.getVehicleByPlate(plate);
                 if (!vehicle) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffThis vehicle is not registered in the system.");
                         return false;
@@ -63,7 +64,7 @@ export class Garage {
                 // Example: exports.ox_inventory.RemoveItem(source, 'money', Config.Garage.StoreCost)
 
                 DeleteEntity(entity);
-                await db.setVehicleStatus(vehicle.id, "stored");
+                await this.db.setVehicleStatus(vehicle.id, "stored");
 
                 sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully parked vehicle.");
                 const coords = GetEntityCoords(ped, true);
@@ -82,7 +83,7 @@ export class Garage {
                         return false;
                 }
 
-                const vehicle = await db.getVehicle(vehicleId);
+                const vehicle = await this.db.getVehicle(vehicleId);
                 if (!vehicle) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffSomething went wrong.");
                         return false;
@@ -127,7 +128,7 @@ export class Garage {
                         return false;
                 }
 
-                await db.setVehicleStatus(vehicleId, "outside");
+                await this.db.setVehicleStatus(vehicleId, "outside");
                 sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully spawned vehicle.");
                 await sendLog(`[VEHICLE] ${getPlayerDisplayName(source)} (${source}) spawned vehicle #${vehicleId} (${vehicle.model}) [${vehicle.plate}] at ${coords[0].toFixed(2)} ${coords[1].toFixed(2)} ${coords[2].toFixed(2)}.`);
 
@@ -150,7 +151,7 @@ export class Garage {
                         return false;
                 }
 
-                const vehicle = await db.getVehicle(vehicleId);
+                const vehicle = await this.db.getVehicle(vehicleId);
                 if (!vehicle) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffSomething went wrong.");
                         return false;
@@ -169,7 +170,7 @@ export class Garage {
                 // Add your inventory check here before deducting (Config.Impound.Cost is the amount).
                 // Add your money deduction here.
 
-                await db.setVehicleStatus(vehicleId, "stored");
+                await this.db.setVehicleStatus(vehicleId, "stored");
                 sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully returned vehicle from impound.");
                 await sendLog(`[VEHICLE] ${getPlayerDisplayName(source)} (${source}) returned vehicle #${vehicleId} from impound.`);
 
@@ -197,7 +198,7 @@ export class Garage {
                 }
 
                 const plate = generatePlate();
-                const result = await db.insertVehicle(plate, targetLicense, args.model, "stored");
+                const result = await this.db.insertVehicle(plate, targetLicense, args.model, "stored");
                 if (!result) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to give vehicle.");
                         return false;
@@ -221,13 +222,13 @@ export class Garage {
                         return false;
                 }
 
-                const existing = await db.getVehicleByPlate(args.plate);
+                const existing = await this.db.getVehicleByPlate(args.plate);
                 if (!existing) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to find vehicle.");
                         return false;
                 }
 
-                const success = await db.deleteVehicle(args.plate);
+                const success = await this.db.deleteVehicle(args.plate);
                 if (!success) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to delete vehicle with the specified plate number from the database.");
                         return false;
@@ -267,7 +268,7 @@ export class Garage {
 
                 SetVehicleNumberPlateText(entity, plate);
 
-                const result = await db.insertVehicle(plate, license, args.model, "outside");
+                const result = await this.db.insertVehicle(plate, license, args.model, "outside");
                 if (!result) {
                         DeleteEntity(entity);
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to spawn the vehicle.");
@@ -298,7 +299,7 @@ export class Garage {
                         return false;
                 }
 
-                const vehicles = await db.getOwnedVehicles(targetLicense);
+                const vehicles = await this.db.getOwnedVehicles(targetLicense);
                 if (vehicles.length === 0) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffNo vehicles found for player with the specified ID.");
                         return false;
@@ -311,3 +312,5 @@ export class Garage {
                 return true;
         }
 }
+
+export const garage = new Garage(db);
