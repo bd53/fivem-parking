@@ -3,12 +3,25 @@ import "./commands";
 import db from "./db";
 import { garage } from "./garage/class";
 
+on("onResourceStart", async (resourceName: string) => {
+        if (resourceName !== GetCurrentResourceName()) return;
+        const count = await db.resetOutsideVehicles();
+        if (count > 0) console.log(`Reset ${count} ghost vehicle(s) to stored.`);
+});
+
 const cooldowns = new Map<number, number>();
 const COOLDOWN_MS = 5000;
 
 on("playerDropped", () => {
         cooldowns.delete(source);
 });
+
+setInterval(() => {
+        const cutoff = Date.now() - COOLDOWN_MS * 2;
+        for (const [playerId, ts] of cooldowns) {
+                if (ts < cutoff) cooldowns.delete(playerId);
+        }
+}, 60000);
 
 function checkCooldown(src: number): boolean {
         const last = cooldowns.get(src);
@@ -19,6 +32,7 @@ function checkCooldown(src: number): boolean {
 }
 
 exports("impoundVehicle", async (plate: string): Promise<boolean> => {
+        if (typeof plate !== "string" || !plate) return false;
         const vehicle = await db.getVehicleByPlate(plate.trim());
         if (!vehicle) return false;
         await db.setVehicleStatus(vehicle.id, "impound");
@@ -26,14 +40,17 @@ exports("impoundVehicle", async (plate: string): Promise<boolean> => {
 });
 
 exports("getVehicleByPlate", async (plate: string) => {
+        if (typeof plate !== "string" || !plate) return null;
         return await db.getVehicleByPlate(plate.trim());
 });
 
 exports("getPlayerVehicles", async (license: string) => {
+        if (typeof license !== "string" || !license) return [];
         return await db.getOwnedVehicles(license.trim());
 });
 
 exports("setVehicleStatus", async (plate: string, status: string): Promise<boolean> => {
+        if (typeof plate !== "string" || !plate) return false;
         if (!["stored", "outside", "impound"].includes(status)) return false;
         const vehicle = await db.getVehicleByPlate(plate.trim());
         if (!vehicle) return false;
@@ -42,6 +59,7 @@ exports("setVehicleStatus", async (plate: string, status: string): Promise<boole
 });
 
 exports("isVehicleOutside", async (plate: string): Promise<boolean> => {
+        if (typeof plate !== "string" || !plate) return false;
         const vehicle = await db.getVehicleByPlate(plate.trim());
         if (!vehicle) return false;
         return vehicle.stored === "outside";

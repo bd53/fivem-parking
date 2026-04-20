@@ -1,9 +1,29 @@
 import * as Cfx from "@nativewrappers/fivem";
-import { Config, generatePlate, getArea, getPlayerDisplayName, getPlayerLicense, isValidModelName, isValidPlate, sendChatMessage, sendLog } from "../utils";
-import db from "../db";
+import { Config, getArea, getPlayerDisplayName, getPlayerLicense, isValidModelName, isValidPlate, sendChatMessage, sendLog } from "../utils";
+import db, { Database } from "../db";
+
+const PLATE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 export class Garage {
-        constructor(private db: typeof db) {}
+        private spawnedEntities = new Map<number, number>();
+
+        constructor(private db: Database) {
+                on("entityRemoved", async (entity: number) => {
+                        const vehicleId = this.spawnedEntities.get(entity);
+                        if (vehicleId === undefined) return;
+                        this.spawnedEntities.delete(entity);
+                        await this.db.setVehicleStatus(vehicleId, "stored");
+                });
+        }
+
+        private async generateUniquePlate(): Promise<string> {
+                for (let i = 0; i < 10; i++) {
+                        const plate = Array.from({ length: 8 }, () => PLATE_CHARS[Math.floor(Math.random() * PLATE_CHARS.length)]).join("");
+                        if (!(await this.db.plateExists(plate))) return plate;
+                }
+                const base = Array.from({ length: 6 }, () => PLATE_CHARS[Math.floor(Math.random() * PLATE_CHARS.length)]).join("");
+                return (base + Date.now().toString(36).slice(-2)).toUpperCase().slice(0, 8);
+        }
 
         public async listVehicles(source: number) {
                 const license = getPlayerLicense(source);
@@ -24,6 +44,8 @@ export class Garage {
                 if (!license) return false;
 
                 const ped = GetPlayerPed(source);
+                if (ped === 0) return false;
+
                 const entity = GetVehiclePedIsIn(ped, false);
                 if (entity === 0) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffYou are not inside of a vehicle!");
@@ -63,8 +85,14 @@ export class Garage {
                 // Add your money deduction here.
                 // Example: exports.ox_inventory.RemoveItem(source, 'money', Config.Garage.StoreCost)
 
+                const parked = await this.db.setVehicleStatusAtomic(vehicle.id, "stored", "outside");
+                if (!parked) {
+                        sendChatMessage(source, "^#d73232ERROR ^#ffffffThis vehicle cannot be parked.");
+                        return false;
+                }
+
+                this.spawnedEntities.delete(entity);
                 DeleteEntity(entity);
-                await this.db.setVehicleStatus(vehicle.id, "stored");
 
                 sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully parked vehicle.");
                 const coords = GetEntityCoords(ped, true);
@@ -103,6 +131,17 @@ export class Garage {
                 // Add your money deduction here.
 
                 const ped = GetPlayerPed(source);
+                if (ped === 0) {
+                        sendChatMessage(source, "^#d73232ERROR ^#ffffffCould not find your character.");
+                        return false;
+                }
+
+                const reserved = await this.db.setVehicleStatusAtomic(vehicleId, "outside", "stored");
+                if (!reserved) {
+                        sendChatMessage(source, "^#d73232ERROR ^#ffffffVehicle is not in storage!");
+                        return false;
+                }
+
                 const coords = GetEntityCoords(ped, true);
                 const heading = GetEntityHeading(ped);
                 const rad = (heading * Math.PI) / 180;
@@ -111,6 +150,7 @@ export class Garage {
 
                 const entity = CreateVehicleServerSetter(GetHashKey(vehicle.model), "automobile", spawnX, spawnY, coords[2] + 1, heading);
                 if (!entity) {
+                        await this.db.setVehicleStatus(vehicleId, "stored");
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to spawn the vehicle.");
                         return false;
                 }
@@ -124,11 +164,14 @@ export class Garage {
                 }
 
                 if (!DoesEntityExist(entity)) {
+                        DeleteEntity(entity);
+                        await this.db.setVehicleStatus(vehicleId, "stored");
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to spawn the vehicle.");
                         return false;
                 }
 
-                await this.db.setVehicleStatus(vehicleId, "outside");
+                this.spawnedEntities.set(entity, vehicleId);
+
                 sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully spawned vehicle.");
                 await sendLog(`[VEHICLE] ${getPlayerDisplayName(source)} (${source}) spawned vehicle #${vehicleId} (${vehicle.model}) [${vehicle.plate}] at ${coords[0].toFixed(2)} ${coords[1].toFixed(2)} ${coords[2].toFixed(2)}.`);
 
@@ -145,7 +188,13 @@ export class Garage {
                         return false;
                 }
 
-                const coords = GetEntityCoords(GetPlayerPed(source), true);
+                const ped = GetPlayerPed(source);
+                if (ped === 0) {
+                        sendChatMessage(source, "^#d73232ERROR ^#ffffffCould not find your character.");
+                        return false;
+                }
+
+                const coords = GetEntityCoords(ped, true);
                 if (!getArea({ x: coords[0], y: coords[1], z: coords[2] }, Config.Impound.Location)) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffYou are not in the impound area!");
                         return false;
@@ -162,15 +211,13 @@ export class Garage {
                         return false;
                 }
 
-                if (vehicle.stored !== "impound") {
+                const returned = await this.db.setVehicleStatusAtomic(vehicleId, "stored", "impound");
+                if (!returned) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffVehicle is not impounded!");
                         return false;
                 }
 
-                // Add your inventory check here before deducting (Config.Impound.Cost is the amount).
-                // Add your money deduction here.
-
-                await this.db.setVehicleStatus(vehicleId, "stored");
+                emitNet("fivem-parking:client:updateVehicleStatus", source, vehicleId, "stored");
                 sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully returned vehicle from impound.");
                 await sendLog(`[VEHICLE] ${getPlayerDisplayName(source)} (${source}) returned vehicle #${vehicleId} from impound.`);
 
@@ -197,9 +244,9 @@ export class Garage {
                         return false;
                 }
 
-                const plate = generatePlate();
-                const result = await this.db.insertVehicle(plate, targetLicense, args.model, "stored");
-                if (!result) {
+                const plate = await this.generateUniquePlate();
+                const vehicleId = await this.db.insertVehicle(plate, targetLicense, args.model, "stored");
+                if (!vehicleId) {
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to give vehicle.");
                         return false;
                 }
@@ -253,9 +300,14 @@ export class Garage {
                 }
 
                 const ped = GetPlayerPed(source);
+                if (ped === 0) {
+                        sendChatMessage(source, "^#d73232ERROR ^#ffffffCould not find your character.");
+                        return false;
+                }
+
                 const coords = GetEntityCoords(ped, true);
                 const heading = GetEntityHeading(ped);
-                const plate = generatePlate();
+                const plate = await this.generateUniquePlate();
                 const rad = (heading * Math.PI) / 180;
                 const spawnX = coords[0] + Math.sin(-rad) * 5;
                 const spawnY = coords[1] + Math.cos(-rad) * 5;
@@ -268,8 +320,8 @@ export class Garage {
 
                 SetVehicleNumberPlateText(entity, plate);
 
-                const result = await this.db.insertVehicle(plate, license, args.model, "outside");
-                if (!result) {
+                const vehicleId = await this.db.insertVehicle(plate, license, args.model, "outside");
+                if (!vehicleId) {
                         DeleteEntity(entity);
                         sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to spawn the vehicle.");
                         return false;
@@ -280,6 +332,9 @@ export class Garage {
                         await Cfx.Delay(50);
                         waited += 50;
                 }
+
+                this.spawnedEntities.set(entity, vehicleId);
+
                 sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully spawned vehicle.");
                 return true;
         }

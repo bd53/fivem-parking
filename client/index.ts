@@ -13,8 +13,11 @@ on("__cfx_nui:spawnVehicle", (data: { vehicleId: number }, cb: (result: string) 
 RegisterNuiCallbackType("returnVehicle");
 on("__cfx_nui:returnVehicle", (data: { vehicleId: number }, cb: (result: string) => void) => {
         emitNet("fivem-parking:server:returnVehicle", data.vehicleId);
-        SetNuiFocus(false, false);
         cb("{}");
+});
+
+onNet("fivem-parking:client:updateVehicleStatus", (vehicleId: number, stored: string) => {
+        SendNUIMessage({ action: "updateVehicleStatus", vehicleId, stored });
 });
 
 RegisterNuiCallbackType("close");

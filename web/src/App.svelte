@@ -50,10 +50,14 @@
                 if (!menuEl) return;
                 const saved = localStorage.getItem("fivem-parking:web:position");
                 if (!saved) return;
-                const { left, top } = JSON.parse(saved);
-                menuEl.style.left = left;
-                menuEl.style.top = top;
-                menuEl.style.right = "auto";
+                try {
+                        const { left, top } = JSON.parse(saved);
+                        menuEl.style.left = left;
+                        menuEl.style.top = top;
+                        menuEl.style.right = "auto";
+                } catch {
+                        localStorage.removeItem("fivem-parking:web:position");
+                }
         }
 
         const SORT_CYCLE: Array<"model" | "plate" | "status"> = [ "model", "plate", "status" ];
@@ -95,7 +99,6 @@
 
         function returnVehicle(vehicleId: number) {
                 fetch("https://fivem-parking/returnVehicle", { method: "POST", body: JSON.stringify({ vehicleId }) });
-                visible = false;
                 expandedId = null;
         }
 
@@ -110,10 +113,20 @@
         onMount(() => {
                 function onMessage(event: MessageEvent) {
                         const data = event.data;
-                        if (!data || typeof data !== "object" || data.action !== "show") return;
+                        if (!data || typeof data !== "object") return;
+
+                        if (data.action === "updateVehicleStatus") {
+                                const id = Number(data.vehicleId);
+                                if (Number.isInteger(id) && typeof data.stored === "string") {
+                                        vehicles = vehicles.map(v => v.id === id ? { ...v, stored: data.stored } : v);
+                                }
+                                return;
+                        }
+
+                        if (data.action !== "show") return;
                         title = typeof data.title === "string" ? data.title : "Your Vehicles";
                         readonly = data.readonly === true;
-                        vehicles = Array.isArray(data.vehicles) ? data.vehicles.filter((v: any) => Number.isInteger(Number(v.id)) && Number(v.id) > 0) : [];
+                        vehicles = Array.isArray(data.vehicles) ? data.vehicles.filter((v: any) => Number.isInteger(Number(v.id)) && Number(v.id) > 0 && typeof v.plate === "string" && typeof v.model === "string" && (v.stored === null || typeof v.stored === "string")) : [];
                         expandedId = null;
                         search = "";
                         visible = true;
