@@ -1,13 +1,9 @@
 import { context } from "esbuild";
 import { readFileSync, writeFileSync } from "fs";
-import { readFile } from "fs/promises";
-import path from "path";
 import process from "process";
 
 const watch = process.argv.includes("--watch");
 const dry = process.argv.includes("--dry-run");
-const windows = /^win/.test(process.platform);
-const escape = (p) => (windows ? p.replace(/\\/g, "/") : p);
 
 const MANIFEST_DEFAULTS = {
         fx_version: "cerulean",
@@ -79,16 +75,6 @@ async function build(development) {
                         {
                                 name: "build",
                                 setup(build) {
-                                        build.onLoad({ filter: /\.(js|ts)$/ }, async (args) => {
-                                                const data = await readFile(args.path, "utf8");
-                                                const shim = /__filename|__dirname/.test(data);
-                                                const location = shim ? `const location = { filename: '${escape(args.path)}', dirname: '${escape(path.dirname(args.path))}' }; let __line = 0;\n` : "";
-                                                const insert = data.includes("__line") ? data.split("\n").map((line, index) => `${line.includes("__line") ? `__line=${index + 1};` : ""}${line}`).join("\n") : data;
-                                                return {
-                                                        contents: shim ? location + insert.replace(/__(?=(filename|dirname))/g, "location.") : insert,
-                                                        loader: path.extname(args.path).slice(1),
-                                                };
-                                        });
                                         build.onEnd((result) => {
                                                 if (result.errors.length > 0) {
                                                         console.error(`Build ended with ${result.errors.length} error(s):`);
