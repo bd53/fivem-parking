@@ -18,8 +18,8 @@ body {
 #menu {
         display: flex;
         flex-direction: column;
-        width: 320px;
-        max-height: 580px;
+        width: 340px;
+        max-height: 600px;
         position: absolute;
         top: 15%;
         right: 25%;
@@ -32,11 +32,15 @@ body {
 #header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        padding: 10px 12px;
+        padding: 12px 14px;
         background: #2c2e33;
         flex-shrink: 0;
         gap: 8px;
+        cursor: grab;
+        user-select: none;
+        &:active {
+                cursor: grabbing;
+        }
 }
 
 #title {
@@ -51,7 +55,7 @@ body {
         background: #25262b;
         border: none;
         color: #909296;
-        cursor: pointer;
+        cursor: pointer !important;
         font-size: 13px;
         line-height: 1;
         width: 28px;
@@ -69,9 +73,53 @@ body {
         }
 }
 
+#toolbar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        background: #25262b;
+        flex-shrink: 0;
+}
+
+#search {
+        flex: 1;
+        background: #2c2e33;
+        border: 1px solid #373a40;
+        border-radius: 4px;
+        color: #fff;
+        font-size: 12px;
+        font-family: inherit;
+        padding: 5px 8px;
+        outline: none;
+        &::placeholder {
+                color: #5c5f66;
+        }
+}
+
+#sort-btn {
+        background: #2c2e33;
+        border: 1px solid #373a40;
+        border-radius: 4px;
+        color: #909296;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: inherit;
+        padding: 5px 10px;
+        width: 64px;
+        text-align: center;
+        cursor: pointer;
+        white-space: nowrap;
+        user-select: none;
+        &:hover {
+                color: #fff;
+        }
+}
+
 #list {
         overflow-y: auto;
         flex: 1;
+        min-height: 0;
         background: #25262b;
         display: flex;
         flex-direction: column;
@@ -93,6 +141,7 @@ body {
         background: #2c2e33;
         border-radius: 4px;
         overflow: hidden;
+        flex-shrink: 0;
         cursor: pointer;
         transition: background 0.1s;
         &:hover {
@@ -106,38 +155,69 @@ body {
 .row-info {
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        gap: 10px;
         padding: 10px 12px;
+}
+
+.row-left {
+        flex: 1;
+        min-width: 0;
 }
 
 .row-model {
         color: #fff;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
 }
 
 .row-id {
         color: #5c5f66;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 400;
+        margin-left: 3px;
 }
 
 .row-plate {
         color: #909296;
-        font-size: 12px;
-        margin-top: 3px;
+        font-size: 11px;
+        margin-top: 2px;
         font-family: monospace;
         letter-spacing: 0.4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+}
+
+.row-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+}
+
+.chevron {
+        color: #5c5f66;
+        font-size: 16px;
+        line-height: 1;
+        transition: transform 0.15s;
+        display: inline-block;
+        &.open {
+                transform: rotate(90deg);
+                color: #909296;
+        }
 }
 
 .badge {
-        font-size: 11px;
-        padding: 3px 8px;
+        font-size: 10px;
+        padding: 3px 7px;
         border-radius: 4px;
-        font-weight: 600;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.4px;
-        flex-shrink: 0;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
         &-stored {
                 background: rgba(55, 178, 77, 0.15);
                 color: #37b24d;
@@ -164,7 +244,7 @@ body {
 
 .action-btn {
         flex: 1;
-        padding: 7px 0;
+        padding: 8px 0;
         border: none;
         border-radius: 4px;
         font-size: 12px;
