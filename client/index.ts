@@ -1,27 +1,33 @@
-onNet("fivem-parking:client:listVehicles", (vehicles: { id: number; plate: string; model: string; stored: string | null }[], title?: string, readonly?: boolean) => {
-        SetNuiFocus(true, true);
-        SendNUIMessage({ action: "show", vehicles, title: title ?? "Your Vehicles", readonly: readonly ?? false });
-});
+import lib, { onServerCallback, triggerServerCallback } from "@overextended/ox_lib/client";
 
-RegisterNuiCallbackType("spawnVehicle");
-on("__cfx_nui:spawnVehicle", (data: { vehicleId: number }, cb: (result: string) => void) => {
-        emitNet("fivem-parking:server:spawnVehicle", data.vehicleId);
-        SetNuiFocus(false, false);
-        cb("{}");
-});
+type Vehicle = { id: number; plate: string; model: string; stored: string | null };
 
-RegisterNuiCallbackType("returnVehicle");
-on("__cfx_nui:returnVehicle", (data: { vehicleId: number }, cb: (result: string) => void) => {
-        emitNet("fivem-parking:server:returnVehicle", data.vehicleId);
-        cb("{}");
-});
+onServerCallback("fivem-parking:client:listVehicles", (vehicles: Vehicle[], title?: string, readonly?: boolean) => {
+        const options = vehicles.map((vehicle) => {
+                const stored = vehicle.stored === "stored";
+                const state = !readonly && (stored || vehicle.stored === "impound");
+                return {
+                        title: `${vehicle.model} (#${vehicle.id})`,
+                        description: vehicle.plate,
+                        metadata: [
+                                {
+                                        label: "Status",
+                                        value: vehicle.stored === "stored" ? "In Garage" : vehicle.stored === "outside" ? "Outside" : vehicle.stored === "impound" ? "Impounded" : "Unknown",
+                                },
+                        ],
+                        disabled: !state,
+                        onSelect: state ? async () => {
+                                if (stored) return triggerServerCallback("fivem-parking:server:spawnVehicle", 10000, vehicle.id);
+                                triggerServerCallback("fivem-parking:server:returnVehicle", 10000, vehicle.id);
+                        } : undefined,
+                };
+        });
 
-onNet("fivem-parking:client:updateVehicleStatus", (vehicleId: number, stored: string) => {
-        SendNUIMessage({ action: "updateVehicleStatus", vehicleId, stored });
-});
+        lib.registerContext({
+                id: "fivem_parking_vehicles",
+                title: title ?? "Your Vehicles",
+                options,
+        });
 
-RegisterNuiCallbackType("close");
-on("__cfx_nui:close", (_data: object, cb: (result: string) => void) => {
-        SetNuiFocus(false, false);
-        cb("{}");
+        lib.showContext("fivem_parking_vehicles");
 });

@@ -6,8 +6,7 @@
         "license": "MIT",
         "type": "module",
         "scripts": {
-                "dev": "vite",
-                "build": "vite build && node build.js",
+                "build": "node build.js",
                 "watch": "node build.js --watch"
         },
         "repository": {
@@ -17,17 +16,14 @@
         "dependencies": {
                 "@nativewrappers/fivem": "^0.0.90",
                 "@nativewrappers/server": "^0.0.90",
-                "node-fetch": "^3.3.2"
+                "node-fetch": "^3.3.2",
+                "@overextended/ox_lib": "latest"
         },
         "devDependencies": {
                 "@citizenfx/client": "latest",
                 "@citizenfx/server": "latest",
-                "@sveltejs/vite-plugin-svelte": "^7.0.0",
                 "@types/node": "^22.13.11",
-                "esbuild": "^0.28.0",
-                "sass": "^1.99.0",
-                "svelte": "^5.28.2",
-                "vite": "^8.0.0"
+                "esbuild": "^0.28.0"
         },
         "engines": {
                 "node": ">=22.9.0"

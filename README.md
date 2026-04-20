@@ -18,11 +18,11 @@ Use `pnpm watch` to rebuild whenever a file is modified.
 
 ## Setup
 
-This resource won't work without [oxmysql](https://github.com/overextended/oxmysql).
+This resource won't work without [oxmysql](https://github.com/overextended/oxmysql) and [ox_lib](https://github.com/overextended/ox_lib).
 
 1. Download or clone the repository with `git clone https://github.com/bd53/fivem-parking`.
 2. Copy `fivem-parking` folder into the `resources/` directory.
-3. Add `ensure fivem-parking` to where resources are being loaded (after oxmysql resource).
+3. Add `ensure fivem-parking` to where resources are being loaded (after oxmysql/ox_lib resource).
 
 ## Usage
 
@@ -30,10 +30,7 @@ This resource won't work without [oxmysql](https://github.com/overextended/oxmys
 
 #### Player
 
-- `/list` _(alias: `/vg`)_ – Lists owned vehicles and their status:
-  - Spawn – available when the vehicle is `stored`.
-  - Return from Impound – available when the vehicle is `impound`.
-  - Currently Outside – shown when the vehicle is already in the world; no action available.
+- `/list` _(alias: `/vg`)_ – Lists owned vehicles along with status.
 - `/park` _(alias: `/vp`)_ – Store a vehicle in your vehicle garage.
 
 #### Admin

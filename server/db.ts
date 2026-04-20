@@ -1,71 +1,37 @@
-type Vehicle = {
+export type VehicleStatus = "stored" | "outside" | "impound";
+
+export type Vehicle = {
         id: number;
         plate: string;
         owner: string;
         model: string;
-        stored: string;
+        stored: VehicleStatus;
 };
 
 const ox = exports.oxmysql;
 
-export class Database {
-        private query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-                return new Promise(resolve => ox.query(sql, params, resolve));
-        }
+const query = <T>(sql: string, params: unknown[] = []): Promise<T[]> => new Promise((resolve, reject) => ox.query(sql, params, (result: T[] | null) => result !== null ? resolve(result) : reject(new Error(`Query returned null: ${sql}`))));
 
-        private single<T>(sql: string, params: unknown[] = []): Promise<T | null> {
-                return new Promise(resolve => ox.single(sql, params, resolve));
-        }
+const single = <T>(sql: string, params: unknown[] = []): Promise<T | null> => new Promise((resolve, reject) => ox.single(sql, params, (result: T | null | undefined) => result !== undefined ? resolve(result) : reject(new Error(`Query returned undefined: ${sql}`))));
 
-        private insert(sql: string, params: unknown[] = []): Promise<number> {
-                return new Promise(resolve => ox.insert(sql, params, resolve));
-        }
+const insert = (sql: string, params: unknown[] = []): Promise<number> => new Promise((resolve, reject) => ox.insert(sql, params, (result: number | null) => result !== null ? resolve(result) : reject(new Error(`Insert returned null: ${sql}`))));
 
-        private update(sql: string, params: unknown[] = []): Promise<number> {
-                return new Promise(resolve => ox.update(sql, params, resolve));
-        }
+const update = (sql: string, params: unknown[] = []): Promise<number> => new Promise((resolve, reject) => ox.update(sql, params, (result: number | null) => result !== null ? resolve(result) : reject(new Error(`Update returned null: ${sql}`))));
 
-        public async getVehicle(id: number): Promise<Vehicle | null> {
-                return this.single<Vehicle>("SELECT id, plate, owner, model, stored FROM parking_vehicles WHERE id = ? LIMIT 1", [id]);
-        }
+export const getVehicle = (id: number) => single<Vehicle>(`SELECT id, plate, owner, model, stored FROM parking_vehicles WHERE id = ? LIMIT 1`, [id]);
 
-        public async getVehicleByPlate(plate: string): Promise<Vehicle | null> {
-                return this.single<Vehicle>("SELECT id, plate, owner, model, stored FROM parking_vehicles WHERE plate = ? LIMIT 1", [plate]);
-        }
+export const getVehicleByPlate = (plate: string) => single<Vehicle>(`$SELECT id, plate, owner, model, stored FROM parking_vehicles WHERE plate = ? LIMIT 1`, [plate]);
 
-        public async plateExists(plate: string): Promise<boolean> {
-                const result = await this.single("SELECT id FROM parking_vehicles WHERE plate = ? LIMIT 1", [plate]);
-                return result !== null;
-        }
+export const plateExists = async (plate: string) => (await single<{ id: number }>("SELECT id FROM parking_vehicles WHERE plate = ? LIMIT 1", [plate])) !== null;
 
-        public async getOwnedVehicles(owner: string): Promise<Vehicle[]> {
-                return this.query<Vehicle>("SELECT id, plate, owner, model, stored FROM parking_vehicles WHERE owner = ? ORDER BY id ASC", [owner]);
-        }
+export const getOwnedVehicles = (owner: string) => query<Vehicle>(`SELECT id, plate, owner, model, stored FROM parking_vehicles WHERE owner = ? ORDER BY id ASC`, [owner]);
 
-        public async setVehicleStatus(id: number, status: string): Promise<boolean> {
-                const affected = await this.update("UPDATE parking_vehicles SET stored = ? WHERE id = ?", [status, id]);
-                return affected > 0;
-        }
+export const setVehicleStatus = async (id: number, status: VehicleStatus) => (await update("UPDATE parking_vehicles SET stored = ? WHERE id = ?", [status, id])) > 0;
 
-        public async setVehicleStatusAtomic(id: number, newStatus: string, expectedStatus: string): Promise<boolean> {
-                const affected = await this.update("UPDATE parking_vehicles SET stored = ? WHERE id = ? AND stored = ?", [newStatus, id, expectedStatus]);
-                return affected > 0;
-        }
+export const setVehicleStatusAtomic = async (id: number, newStatus: VehicleStatus, expectedStatus: VehicleStatus) => (await update("UPDATE parking_vehicles SET stored = ? WHERE id = ? AND stored = ?", [newStatus, id, expectedStatus])) > 0;
 
-        public async resetOutsideVehicles(): Promise<number> {
-                return this.update("UPDATE parking_vehicles SET stored = 'stored' WHERE stored = 'outside'");
-        }
+export const resetOutsideVehicles = () => update("UPDATE parking_vehicles SET stored = 'stored' WHERE stored = 'outside'");
 
-        public async insertVehicle(plate: string, owner: string, model: string, stored: string = "stored"): Promise<number> {
-                return this.insert("INSERT INTO parking_vehicles (plate, owner, model, stored) VALUES (?, ?, ?, ?)", [plate, owner, model, stored]);
-        }
+export const insertVehicle = (plate: string, owner: string, model: string, stored: VehicleStatus = "stored") => insert("INSERT INTO parking_vehicles (plate, owner, model, stored) VALUES (?, ?, ?, ?)", [plate, owner, model, stored]);
 
-        public async deleteVehicle(plate: string): Promise<boolean> {
-                const affected = await this.update("DELETE FROM parking_vehicles WHERE plate = ?", [plate]);
-                return affected > 0;
-        }
-}
-
-const db = new Database();
-
-export default db;
+export const deleteVehicle = async (plate: string) => (await update("DELETE FROM parking_vehicles WHERE plate = ?", [plate])) > 0;

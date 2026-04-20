@@ -1,25 +1,38 @@
 import * as Cfx from "@nativewrappers/fivem";
-import { Config, getArea, getPlayerDisplayName, getPlayerLicense, isValidModelName, isValidPlate, sendChatMessage, sendLog } from "../utils";
-import db, { Database } from "../db";
+import { triggerClientCallback } from "@overextended/ox_lib/server";
+import { Config, getArea, getPlayerDisplayName, getPlayerLicense, isValidModelName, isValidPlate, notify, sendLog } from "../utils";
+import { getVehicle, getVehicleByPlate, getOwnedVehicles, plateExists, setVehicleStatus, setVehicleStatusAtomic, insertVehicle, deleteVehicle, Vehicle, VehicleStatus } from "../db";
 
 const PLATE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 export class Garage {
         private spawnedEntities = new Map<number, number>();
+        private vehicleCache = new Map<string, Vehicle[]>();
 
-        constructor(private db: Database) {
+        constructor() {
                 on("entityRemoved", async (entity: number) => {
                         const vehicleId = this.spawnedEntities.get(entity);
                         if (vehicleId === undefined) return;
                         this.spawnedEntities.delete(entity);
-                        await this.db.setVehicleStatus(vehicleId, "stored");
+                        await setVehicleStatusAtomic(vehicleId, "stored", "outside");
                 });
+        }
+
+        private updateCacheStatus(license: string, vehicleId: number, status: VehicleStatus) {
+                const cached = this.vehicleCache.get(license);
+                if (!cached) return;
+                const vehicle = cached.find(v => v.id === vehicleId);
+                if (vehicle) vehicle.stored = status;
+        }
+
+        public clearPlayerCache(license: string) {
+                this.vehicleCache.delete(license);
         }
 
         private async generateUniquePlate(): Promise<string> {
                 for (let i = 0; i < 10; i++) {
                         const plate = Array.from({ length: 8 }, () => PLATE_CHARS[Math.floor(Math.random() * PLATE_CHARS.length)]).join("");
-                        if (!(await this.db.plateExists(plate))) return plate;
+                        if (!(await plateExists(plate))) return plate;
                 }
                 const base = Array.from({ length: 6 }, () => PLATE_CHARS[Math.floor(Math.random() * PLATE_CHARS.length)]).join("");
                 return (base + Date.now().toString(36).slice(-2)).toUpperCase().slice(0, 8);
@@ -29,13 +42,14 @@ export class Garage {
                 const license = getPlayerLicense(source);
                 if (!license) return [];
 
-                const vehicles = await this.db.getOwnedVehicles(license);
+                const vehicles = await getOwnedVehicles(license);
                 if (!vehicles || vehicles.length === 0) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou do not own any vehicles!");
+                        notify(source, "You do not own any vehicles!", "error");
                         return [];
                 }
 
-                emitNet("fivem-parking:client:listVehicles", source, vehicles);
+                this.vehicleCache.set(license, vehicles);
+                triggerClientCallback("fivem-parking:client:listVehicles", source, vehicles);
                 return vehicles;
         }
 
@@ -48,53 +62,56 @@ export class Garage {
 
                 const entity = GetVehiclePedIsIn(ped, false);
                 if (entity === 0) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou are not inside of a vehicle!");
+                        notify(source, "You are not inside of a vehicle!", "error");
                         return false;
                 }
 
                 if (GetPedInVehicleSeat(entity, -1) !== ped) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou must be the driver to park!");
+                        notify(source, "You must be the driver to park!", "error");
                         return false;
                 }
 
                 const plate = GetVehicleNumberPlateText(entity).trim();
                 if (!isValidPlate(plate)) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffThis vehicle has an invalid plate number.");
+                        notify(source, "This vehicle has an invalid plate number.", "error");
                         return false;
                 }
 
-                const vehicle = await this.db.getVehicleByPlate(plate);
+                const cached = this.vehicleCache.get(license);
+                const vehicle = cached?.find(v => v.plate === plate) ?? await getVehicleByPlate(plate);
+
                 if (!vehicle) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffThis vehicle is not registered in the system.");
+                        notify(source, "This vehicle is not registered in the system.", "error");
                         return false;
                 }
 
                 if (vehicle.owner !== license) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou are not the owner of this vehicle!");
+                        notify(source, "You are not the owner of this vehicle!", "error");
                         return false;
                 }
 
                 if (vehicle.stored !== "outside") {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffThis vehicle cannot be parked.");
+                        notify(source, "This vehicle cannot be parked.", "error");
                         return false;
                 }
 
                 // Add your inventory check here before deducting (Config.Garage.StoreCost is the amount).
-                // Example: if (exports.ox_inventory.GetItemCount(source, 'money') < Config.Garage.StoreCost) { ... }
+                // Example: if (exports.ox_inventory.GetItemCount(source, "money") < Config.Garage.StoreCost) { ... }
 
                 // Add your money deduction here.
-                // Example: exports.ox_inventory.RemoveItem(source, 'money', Config.Garage.StoreCost)
+                // Example: exports.ox_inventory.RemoveItem(source, "money", Config.Garage.StoreCost)
 
-                const parked = await this.db.setVehicleStatusAtomic(vehicle.id, "stored", "outside");
+                const parked = await setVehicleStatusAtomic(vehicle.id, "stored", "outside");
                 if (!parked) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffThis vehicle cannot be parked.");
+                        notify(source, "This vehicle cannot be parked.", "error");
                         return false;
                 }
 
+                this.updateCacheStatus(license, vehicle.id, "stored");
                 this.spawnedEntities.delete(entity);
                 DeleteEntity(entity);
 
-                sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully parked vehicle.");
+                notify(source, "Successfully parked vehicle.", "success");
                 const coords = GetEntityCoords(ped, true);
                 await sendLog(`[VEHICLE] ${getPlayerDisplayName(source)} (${source}) parked vehicle #${vehicle.id} (${vehicle.model}) [${vehicle.plate}] at ${coords[0].toFixed(2)} ${coords[1].toFixed(2)} ${coords[2].toFixed(2)}.`);
 
@@ -107,23 +124,20 @@ export class Garage {
 
                 const { vehicleId } = args;
                 if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffInvalid vehicle ID.");
+                        notify(source, "Invalid vehicle ID.", "error");
                         return false;
                 }
 
-                const vehicle = await this.db.getVehicle(vehicleId);
-                if (!vehicle) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffSomething went wrong.");
-                        return false;
-                }
+                const cached = this.vehicleCache.get(license);
+                const vehicle = cached?.find(v => v.id === vehicleId) ?? await getVehicle(vehicleId);
 
-                if (vehicle.owner !== license) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou are not the owner of this vehicle!");
+                if (!vehicle || vehicle.owner !== license) {
+                        notify(source, "Something went wrong.", "error");
                         return false;
                 }
 
                 if (vehicle.stored !== "stored") {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffVehicle is not in storage!");
+                        notify(source, "Vehicle is not in storage!", "error");
                         return false;
                 }
 
@@ -132,15 +146,17 @@ export class Garage {
 
                 const ped = GetPlayerPed(source);
                 if (ped === 0) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffCould not find your character.");
+                        notify(source, "Could not find your character.", "error");
                         return false;
                 }
 
-                const reserved = await this.db.setVehicleStatusAtomic(vehicleId, "outside", "stored");
+                const reserved = await setVehicleStatusAtomic(vehicleId, "outside", "stored");
                 if (!reserved) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffVehicle is not in storage!");
+                        notify(source, "Vehicle is not in storage!", "error");
                         return false;
                 }
+
+                this.updateCacheStatus(license, vehicleId, "outside");
 
                 const coords = GetEntityCoords(ped, true);
                 const heading = GetEntityHeading(ped);
@@ -150,11 +166,13 @@ export class Garage {
 
                 const entity = CreateVehicleServerSetter(GetHashKey(vehicle.model), "automobile", spawnX, spawnY, coords[2] + 1, heading);
                 if (!entity) {
-                        await this.db.setVehicleStatus(vehicleId, "stored");
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to spawn the vehicle.");
+                        await setVehicleStatus(vehicleId, "stored");
+                        this.updateCacheStatus(license, vehicleId, "stored");
+                        notify(source, "Failed to spawn the vehicle.", "error");
                         return false;
                 }
 
+                this.spawnedEntities.set(entity, vehicleId);
                 SetVehicleNumberPlateText(entity, vehicle.plate);
 
                 let waited = 0;
@@ -164,15 +182,15 @@ export class Garage {
                 }
 
                 if (!DoesEntityExist(entity)) {
+                        this.spawnedEntities.delete(entity);
                         DeleteEntity(entity);
-                        await this.db.setVehicleStatus(vehicleId, "stored");
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to spawn the vehicle.");
+                        await setVehicleStatus(vehicleId, "stored");
+                        this.updateCacheStatus(license, vehicleId, "stored");
+                        notify(source, "Failed to spawn the vehicle.", "error");
                         return false;
                 }
 
-                this.spawnedEntities.set(entity, vehicleId);
-
-                sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully spawned vehicle.");
+                notify(source, "Successfully spawned vehicle.", "success");
                 await sendLog(`[VEHICLE] ${getPlayerDisplayName(source)} (${source}) spawned vehicle #${vehicleId} (${vehicle.model}) [${vehicle.plate}] at ${coords[0].toFixed(2)} ${coords[1].toFixed(2)} ${coords[2].toFixed(2)}.`);
 
                 return true;
@@ -184,41 +202,39 @@ export class Garage {
 
                 const { vehicleId } = args;
                 if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffInvalid vehicle ID.");
+                        notify(source, "Invalid vehicle ID.", "error");
                         return false;
                 }
 
                 const ped = GetPlayerPed(source);
                 if (ped === 0) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffCould not find your character.");
+                        notify(source, "Could not find your character.", "error");
                         return false;
                 }
 
                 const coords = GetEntityCoords(ped, true);
                 if (!getArea({ x: coords[0], y: coords[1], z: coords[2] }, Config.Impound.Location)) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou are not in the impound area!");
+                        notify(source, "You are not in the impound area!", "error");
                         return false;
                 }
 
-                const vehicle = await this.db.getVehicle(vehicleId);
-                if (!vehicle) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffSomething went wrong.");
+                const cached = this.vehicleCache.get(license);
+                const vehicle = cached?.find(v => v.id === vehicleId) ?? await getVehicle(vehicleId);
+
+                if (!vehicle || vehicle.owner !== license) {
+                        notify(source, "Something went wrong.", "error");
                         return false;
                 }
 
-                if (vehicle.owner !== license) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou are not the owner of this vehicle!");
-                        return false;
-                }
-
-                const returned = await this.db.setVehicleStatusAtomic(vehicleId, "stored", "impound");
+                const returned = await setVehicleStatusAtomic(vehicleId, "stored", "impound");
                 if (!returned) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffVehicle is not impounded!");
+                        notify(source, "Vehicle is not impounded!", "error");
                         return false;
                 }
 
-                emitNet("fivem-parking:client:updateVehicleStatus", source, vehicleId, "stored");
-                sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully returned vehicle from impound.");
+                this.updateCacheStatus(license, vehicleId, "stored");
+
+                notify(source, "Successfully returned vehicle from impound.", "success");
                 await sendLog(`[VEHICLE] ${getPlayerDisplayName(source)} (${source}) returned vehicle #${vehicleId} from impound.`);
 
                 return true;
@@ -226,7 +242,7 @@ export class Garage {
 
         public async adminGiveVehicle(source: number, args: { model: string; playerId: number }): Promise<boolean> {
                 if (!IsPlayerAceAllowed(String(source), Config.Group)) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou do not have permission to use this command.");
+                        notify(source, "You do not have permission to use this command.", "error");
                         return false;
                 }
 
@@ -234,30 +250,31 @@ export class Garage {
                 if (!license) return false;
 
                 if (!isValidModelName(args.model)) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffInvalid vehicle model name.");
+                        notify(source, "Invalid vehicle model name.", "error");
                         return false;
                 }
 
                 const targetLicense = getPlayerLicense(args.playerId);
                 if (!targetLicense) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffNo player with the specified ID found.");
+                        notify(source, "No player with the specified ID found.", "error");
                         return false;
                 }
 
                 const plate = await this.generateUniquePlate();
-                const vehicleId = await this.db.insertVehicle(plate, targetLicense, args.model, "stored");
+                const vehicleId = await insertVehicle(plate, targetLicense, args.model, "stored");
                 if (!vehicleId) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to give vehicle.");
+                        notify(source, "Failed to give vehicle.", "error");
                         return false;
                 }
 
-                sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully spawned vehicle.");
+                this.vehicleCache.delete(targetLicense);
+                notify(source, "Successfully spawned vehicle.", "success");
                 return true;
         }
 
         public async adminDeleteVehicle(source: number, args: { plate: string }): Promise<boolean> {
                 if (!IsPlayerAceAllowed(String(source), Config.Group)) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou do not have permission to use this command.");
+                        notify(source, "You do not have permission to use this command.", "error");
                         return false;
                 }
 
@@ -265,29 +282,30 @@ export class Garage {
                 if (!license) return false;
 
                 if (!isValidPlate(args.plate)) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffInvalid plate number.");
+                        notify(source, "Invalid plate number.", "error");
                         return false;
                 }
 
-                const existing = await this.db.getVehicleByPlate(args.plate);
+                const existing = await getVehicleByPlate(args.plate);
                 if (!existing) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to find vehicle.");
+                        notify(source, "Failed to find vehicle.", "error");
                         return false;
                 }
 
-                const success = await this.db.deleteVehicle(args.plate);
+                const success = await deleteVehicle(args.plate);
                 if (!success) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to delete vehicle with the specified plate number from the database.");
+                        notify(source, "Failed to delete vehicle with the specified plate number from the database.", "error");
                         return false;
                 }
 
-                sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully deleted vehicle with the specified plate number from the database.");
+                this.vehicleCache.delete(existing.owner);
+                notify(source, "Successfully deleted vehicle with the specified plate number from the database.", "success");
                 return true;
         }
 
         public async adminSetVehicle(source: number, args: { model: string }): Promise<boolean> {
                 if (!IsPlayerAceAllowed(String(source), Config.Group)) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou do not have permission to use this command.");
+                        notify(source, "You do not have permission to use this command.", "error");
                         return false;
                 }
 
@@ -295,13 +313,13 @@ export class Garage {
                 if (!license) return false;
 
                 if (!isValidModelName(args.model)) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffInvalid vehicle model name.");
+                        notify(source, "Invalid vehicle model name.", "error");
                         return false;
                 }
 
                 const ped = GetPlayerPed(source);
                 if (ped === 0) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffCould not find your character.");
+                        notify(source, "Could not find your character.", "error");
                         return false;
                 }
 
@@ -314,16 +332,16 @@ export class Garage {
 
                 const entity = CreateVehicleServerSetter(GetHashKey(args.model), "automobile", spawnX, spawnY, coords[2] + 1, heading);
                 if (!entity) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to spawn the vehicle.");
+                        notify(source, "Failed to spawn the vehicle.", "error");
                         return false;
                 }
 
                 SetVehicleNumberPlateText(entity, plate);
 
-                const vehicleId = await this.db.insertVehicle(plate, license, args.model, "outside");
+                const vehicleId = await insertVehicle(plate, license, args.model, "outside");
                 if (!vehicleId) {
                         DeleteEntity(entity);
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffFailed to spawn the vehicle.");
+                        notify(source, "Failed to spawn the vehicle.", "error");
                         return false;
                 }
 
@@ -334,14 +352,15 @@ export class Garage {
                 }
 
                 this.spawnedEntities.set(entity, vehicleId);
+                this.vehicleCache.delete(license);
 
-                sendChatMessage(source, "^#5e81ac[INFO] ^#ffffffSuccessfully spawned vehicle.");
+                notify(source, "Successfully spawned vehicle.", "success");
                 return true;
         }
 
         public async adminViewVehicles(source: number, args: { playerId: number }): Promise<boolean> {
                 if (!IsPlayerAceAllowed(String(source), Config.Group)) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffYou do not have permission to use this command.");
+                        notify(source, "You do not have permission to use this command.", "error");
                         return false;
                 }
 
@@ -350,22 +369,22 @@ export class Garage {
 
                 const targetLicense = getPlayerLicense(args.playerId);
                 if (!targetLicense) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffNo player with the specified ID found.");
+                        notify(source, "No player with the specified ID found.", "error");
                         return false;
                 }
 
-                const vehicles = await this.db.getOwnedVehicles(targetLicense);
+                const vehicles = await getOwnedVehicles(targetLicense);
                 if (vehicles.length === 0) {
-                        sendChatMessage(source, "^#d73232ERROR ^#ffffffNo vehicles found for player with the specified ID.");
+                        notify(source, "No vehicles found for player with the specified ID.", "error");
                         return false;
                 }
 
                 const targetName = getPlayerDisplayName(args.playerId);
-                emitNet("fivem-parking:client:listVehicles", source, vehicles, `${targetName}'s Vehicles`, true);
+                triggerClientCallback("fivem-parking:client:listVehicles", source, vehicles, `${targetName}"s Vehicles`, true);
                 await sendLog(`${getPlayerDisplayName(source)} (${source}) viewed vehicles for ${targetName} (${args.playerId}).`);
 
                 return true;
         }
 }
 
-export const garage = new Garage(db);
+export const garage = new Garage();

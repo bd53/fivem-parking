@@ -9,11 +9,10 @@ const MANIFEST_DEFAULTS = {
         fx_version: "cerulean",
         game: "gta5",
         node_version: "22",
-        ui_page: "dist/web/index.html",
+        shared_scripts: ["@ox_lib/init.lua"],
         client_scripts: ["dist/client/*.js"],
         server_scripts: ["dist/server/*.js"],
-        files: ["dist/web/**/*"],
-        dependencies: ["/server:12913", "/onesync"],
+        dependencies: ["/server:12913", "/onesync", "oxmysql", "ox_lib"],
 };
 
 function sanitize(s) {
@@ -46,11 +45,10 @@ function generateManifest() {
         addField(lines, "repository", pkg.repository?.url);
         addField(lines, "license", pkg.license);
         addField(lines, "node_version", MANIFEST_DEFAULTS.node_version);
-        addField(lines, "ui_page", MANIFEST_DEFAULTS.ui_page);
 
+        addTable(lines, "shared_scripts", MANIFEST_DEFAULTS.shared_scripts);
         addTable(lines, "client_scripts", MANIFEST_DEFAULTS.client_scripts);
         addTable(lines, "server_scripts", MANIFEST_DEFAULTS.server_scripts);
-        addTable(lines, "files", MANIFEST_DEFAULTS.files);
         addTable(lines, "dependencies", MANIFEST_DEFAULTS.dependencies);
 
         const manifest = lines.join("\n");
